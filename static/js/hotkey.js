@@ -7,6 +7,14 @@ function do_narrow_action(action) {
     return true;
 }
 
+
+function focus_in_empty_compose() {
+    return (
+        compose.composing() &&
+        compose.message_content() === "" &&
+        $('#new_message_content').is(':focus'));
+}
+
 function is_settings_page() {
   return (/^#*(settings|administration)/g).test(window.location.hash);
 }
@@ -115,12 +123,15 @@ function process_hotkey(e) {
     var focused_message_edit_content;
     var focused_message_edit_save;
     var message_edit_form;
-    var focus_in_empty_compose;
     var hotkey = get_hotkey_from_event(e);
     var event_name = hotkey.name;
     activity.new_user_input = true;
 
-    if (ui.home_tab_obscured() && hotkey.message_view_only) {
+    if (event_name === 'ignore') {
+        return false;
+    }
+
+    if (hotkey.message_view_only && ui.home_tab_obscured()) {
         return false;
     }
 
@@ -131,19 +142,22 @@ function process_hotkey(e) {
         return false;
     }
 
-    var tab_list = tab_up_down(e);
-    if (tab_list.flag) {
-        if (hotkey.name === "up_arrow") {
+    var tab_list;
+
+    if (event_name === "up_arrow") {
+        tab_list = tab_up_down(e);
+        if (tab_list.flag) {
             tab_list.prev().focus();
-            return true;
-        } else if (hotkey.name === "down_arrow") {
-            tab_list.next().focus();
             return true;
         }
     }
 
-    if (event_name === 'ignore') {
-        return false;
+    if (event_name === "down_arrow") {
+        tab_list = tab_up_down(e);
+        if (tab_list.flag) {
+            tab_list.next().focus();
+            return true;
+        }
     }
 
     if (popovers.actions_popped() && actions_dropdown_hotkeys.indexOf(event_name) !== -1) {
@@ -244,11 +258,6 @@ function process_hotkey(e) {
 
     // Process hotkeys specially when in an input, select, textarea, or send button
     if ($('input:focus,select:focus,textarea:focus,#compose-send-button:focus').length > 0) {
-        focus_in_empty_compose = (
-            compose.composing() &&
-            compose.message_content() === "" &&
-            $('#new_message_content').is(':focus'));
-
         if (event_name === 'escape') {
             // emoji window should trap escape before it is able to close the compose box
             if ($('.emoji_popover').css('display') === 'inline-block') {
@@ -305,13 +314,13 @@ function process_hotkey(e) {
             }
         }
 
-        if (event_name === 'left_arrow' && focus_in_empty_compose) {
+        if (event_name === 'left_arrow' && focus_in_empty_compose()) {
             compose.cancel();
             message_edit.edit_last_sent_message();
             return true;
         }
 
-        if ((event_name === 'up_arrow' || event_name === 'down_arrow') && focus_in_empty_compose) {
+        if ((event_name === 'up_arrow' || event_name === 'down_arrow') && focus_in_empty_compose()) {
             compose.cancel();
             // don't return, as we still want it to be picked up by the code below
         } else {
@@ -337,18 +346,21 @@ function process_hotkey(e) {
         return false;
     }
 
-    // There's special handling for when you're previewing a composition
-    if ($("#preview_message_area").is(":visible")) {
-        compose.enter_with_preview_open();
-        return true;
-    }
-
     // Shortcuts that don't require a message
     switch (event_name) {
-        case 'narrow_private':
-            return do_narrow_action(function (target, opts) {
-                narrow.by('is', 'private', opts);
-            });
+        case 'compose': // 'c': compose
+            compose.start('stream', {trigger: "compose_hotkey"});
+            return true;
+        case 'compose_private_message':
+            compose.start('private', {trigger: "compose_hotkey"});
+            return true;
+        case 'enter':
+            // There's special handling for when you're previewing a composition
+            if ($("#preview_message_area").is(":visible")) {
+                compose.enter_with_preview_open();
+                return true;
+            }
+            break;
         case 'escape': // Esc: close actions popup, cancel compose, clear a find, or un-narrow
             if ($('.emoji_popover').css('display') === 'inline-block') {
                 popovers.hide_emoji_map_popover();
@@ -360,17 +372,15 @@ function process_hotkey(e) {
                 search.clear_search();
             }
             return true;
-        case 'compose': // 'c': compose
-            compose.start('stream', {trigger: "compose_hotkey"});
-            return true;
-        case 'compose_private_message':
-            compose.start('private', {trigger: "compose_hotkey"});
+        case 'narrow_private':
+            return do_narrow_action(function (target, opts) {
+                narrow.by('is', 'private', opts);
+            });
+        case 'query_streams':
+            stream_list.initiate_search();
             return true;
         case 'query_users':
             activity.initiate_search();
-            return true;
-        case 'query_streams':
-            stream_list.initiate_search();
             return true;
         case 'search':
             search.initiate_search();

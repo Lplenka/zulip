@@ -151,15 +151,15 @@ class TestProcessCountStat(AnalyticsTestCase):
         # type: (datetime) -> CountStat
         dummy_query = """INSERT INTO analytics_realmcount (realm_id, property, end_time, value)
                                 VALUES (1, 'test stat', '%(end_time)s', 22)""" % {'end_time': current_time}
-        count_stat = CountStat('test stat', ZerverCountQuery(Recipient, UserCount, dummy_query),
-                               {}, None, CountStat.HOUR, False)
-        return count_stat
+        stat = CountStat('test stat', ZerverCountQuery(Recipient, UserCount, dummy_query),
+                         {}, None, CountStat.HOUR, False)
+        return stat
 
-    def assertFillStateEquals(self, end_time, state = FillState.DONE, property = None):
+    def assertFillStateEquals(self, end_time, state=FillState.DONE, property=None):
         # type: (datetime, int, Optional[Text]) -> None
-        count_stat = self.make_dummy_count_stat(end_time)
+        stat = self.make_dummy_count_stat(end_time)
         if property is None:
-            property = count_stat.property
+            property = stat.property
         fill_state = FillState.objects.filter(property=property).first()
         self.assertEqual(fill_state.end_time, end_time)
         self.assertEqual(fill_state.state, state)
@@ -168,27 +168,27 @@ class TestProcessCountStat(AnalyticsTestCase):
         # type: () -> None
         # process new stat
         current_time = installation_epoch() + self.HOUR
-        count_stat = self.make_dummy_count_stat(current_time)
-        property = count_stat.property
-        process_count_stat(count_stat, current_time)
+        stat = self.make_dummy_count_stat(current_time)
+        property = stat.property
+        process_count_stat(stat, current_time)
         self.assertFillStateEquals(current_time)
         self.assertEqual(InstallationCount.objects.filter(property=property).count(), 1)
 
         # dirty stat
         FillState.objects.filter(property=property).update(state=FillState.STARTED)
-        process_count_stat(count_stat, current_time)
+        process_count_stat(stat, current_time)
         self.assertFillStateEquals(current_time)
         self.assertEqual(InstallationCount.objects.filter(property=property).count(), 1)
 
         # clean stat, no update
-        process_count_stat(count_stat, current_time)
+        process_count_stat(stat, current_time)
         self.assertFillStateEquals(current_time)
         self.assertEqual(InstallationCount.objects.filter(property=property).count(), 1)
 
         # clean stat, with update
         current_time = current_time + self.HOUR
-        count_stat = self.make_dummy_count_stat(current_time)
-        process_count_stat(count_stat, current_time)
+        stat = self.make_dummy_count_stat(current_time)
+        process_count_stat(stat, current_time)
         self.assertFillStateEquals(current_time)
         self.assertEqual(InstallationCount.objects.filter(property=property).count(), 2)
 
@@ -392,7 +392,7 @@ class TestCountStats(AnalyticsTestCase):
 
     def test_messages_sent_to_stream_by_is_bot(self):
         # type: () -> None
-        stat = COUNT_STATS['messages_sent_to_stream:is_bot:hour']
+        stat = COUNT_STATS['messages_in_stream:is_bot:day']
         self.current_property = stat.property
 
         bot = self.create_user(is_bot=True)
@@ -420,9 +420,10 @@ class TestCountStats(AnalyticsTestCase):
 
         self.assertTableState(StreamCount, ['value', 'subgroup', 'stream'],
                               [[2, 'false', stream1], [1, 'false', stream2], [2, 'true', stream2],
-                               # "hourly" stream, from TestCountStats.setUp
-                               [1, 'false', Stream.objects.get(name='stream 1')]])
+                               # "hourly" and "daily" stream, from TestCountStats.setUp
+                               [1, 'false', Stream.objects.get(name='stream 1')],
+                               [1, 'false', Stream.objects.get(name='stream 61')]])
         self.assertTableState(RealmCount, ['value', 'subgroup', 'realm'],
-                              [[3, 'false'], [2, 'true'], [1, 'false', self.second_realm]])
-        self.assertTableState(InstallationCount, ['value', 'subgroup'], [[4, 'false'], [2, 'true']])
+                              [[3, 'false'], [2, 'true'], [2, 'false', self.second_realm]])
+        self.assertTableState(InstallationCount, ['value', 'subgroup'], [[5, 'false'], [2, 'true']])
         self.assertTableState(UserCount, [], [])

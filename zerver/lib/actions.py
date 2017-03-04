@@ -82,7 +82,7 @@ from zerver.lib.session_user import get_session_user
 from zerver.lib.upload import attachment_url_re, attachment_url_to_path_id, \
     claim_attachment, delete_message_image
 from zerver.lib.str_utils import NonBinaryStr, force_str
-from zerver.tornado.event_queue import request_event_queue, get_user_events, send_event
+from zerver.tornado.event_queue import request_event_queue, send_event
 
 import DNS
 import ujson
@@ -122,7 +122,7 @@ def log_event(event):
 
     template = os.path.join(settings.EVENT_LOG_DIR,
                             '%s.' + platform.node() +
-                            datetime.datetime.now().strftime('.%Y-%m-%d'))
+                            timezone.now().strftime('.%Y-%m-%d'))
 
     with lockfile(template % ('lock',)):
         with open(template % ('events',), 'a') as log:
@@ -445,7 +445,7 @@ def delete_realm_user_sessions(realm):
     # type: (Realm) -> None
     realm_user_ids = [user_profile.id for user_profile in
                       UserProfile.objects.filter(realm=realm)]
-    for session in Session.objects.filter(expire_date__gte=datetime.datetime.now()):
+    for session in Session.objects.filter(expire_date__gte=timezone.now()):
         if get_session_user(session) in realm_user_ids:
             delete_session(session)
 
@@ -2372,6 +2372,18 @@ def do_change_left_side_userlist(user_profile, setting_value, log=True):
     event = {'type': 'update_display_settings',
              'user': user_profile.email,
              'setting_name': 'left_side_userlist',
+             'setting': setting_value}
+    if log:
+        log_event(event)
+    send_event(event, [user_profile.id])
+
+def do_change_emoji_alt_code(user_profile, setting_value, log=True):
+    # type: (UserProfile, bool, bool) -> None
+    user_profile.emoji_alt_code = setting_value
+    user_profile.save(update_fields=["emoji_alt_code"])
+    event = {'type': 'update_display_settings',
+             'user': user_profile.email,
+             'setting_name': 'emoji_alt_code',
              'setting': setting_value}
     if log:
         log_event(event)

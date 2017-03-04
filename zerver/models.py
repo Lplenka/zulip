@@ -566,6 +566,7 @@ class UserProfile(ModelReprMixin, AbstractBaseUser, PermissionsMixin):
     enter_sends = models.NullBooleanField(default=False) # type: Optional[bool]
     autoscroll_forever = models.BooleanField(default=False) # type: bool
     left_side_userlist = models.BooleanField(default=False) # type: bool
+    emoji_alt_code = models.BooleanField(default=False) # type: bool
 
     # display settings
     twenty_four_hour_time = models.BooleanField(default=False) # type: bool
@@ -1354,6 +1355,8 @@ class UserPresence(models.Model):
             return 'active'
         elif status == UserPresence.IDLE:
             return 'idle'
+        else:
+            raise ValueError('Unknown status: %s' % (status,))
 
     @staticmethod
     def get_status_dict_by_user(user_profile):

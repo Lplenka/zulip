@@ -148,6 +148,7 @@ def fetch_initial_state_data(user_profile, event_types, queue_id,
     if want('update_display_settings'):
         state['twenty_four_hour_time'] = user_profile.twenty_four_hour_time
         state['left_side_userlist'] = user_profile.left_side_userlist
+        state['emoji_alt_code'] = user_profile.emoji_alt_code
 
         default_language = user_profile.default_language
         state['default_language'] = default_language
@@ -374,6 +375,8 @@ def apply_event(state, event, user_profile, include_subscribers):
             state['twenty_four_hour_time'] = event["setting"]
         if event['setting_name'] == 'left_side_userlist':
             state['left_side_userlist'] = event["setting"]
+        if event['setting_name'] == 'emoji_alt_code':
+            state['emoji_alt_code'] = event["setting"]
     elif event['type'] == "update_global_notifications":
         if event['notification_name'] == "enable_stream_desktop_notifications":
             state['enable_stream_desktop_notifications'] = event['setting']
@@ -419,7 +422,7 @@ def do_events_register(user_profile, user_client, apply_markdown=True,
     # Apply events that came in while we were fetching initial data
     events = get_user_events(user_profile, queue_id, -1)
     apply_events(ret, events, user_profile, include_subscribers=include_subscribers)
-    if events:
+    if len(events) > 0:
         ret['last_event_id'] = events[-1]['id']
     else:
         ret['last_event_id'] = -1
